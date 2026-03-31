@@ -1,0 +1,53 @@
+{
+  "_comment": "Airbyte connection spec for Google Ads API. Import via Airbyte UI or API.",
+  "name": "retailpulse-google-ads",
+  "sourceDefinitionId": "253487c0-2246-43ba-a21f-5116b20a2c50",
+  "sourceConfiguration": {
+    "credentials": {
+      "auth_type": "Service Account Key Authentication",
+      "developer_token": "${GOOGLE_ADS_DEVELOPER_TOKEN}",
+      "client_id": "${GOOGLE_ADS_CLIENT_ID}",
+      "client_secret": "${GOOGLE_ADS_CLIENT_SECRET}",
+      "refresh_token": "${GOOGLE_ADS_REFRESH_TOKEN}"
+    },
+    "customer_id": "${GOOGLE_ADS_CUSTOMER_ID}",
+    "start_date": "2024-01-01",
+    "conversion_window_days": 14,
+    "custom_queries": [
+      {
+        "query": "SELECT campaign.id, campaign.name, campaign.status, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, segments.date FROM campaign WHERE segments.date DURING LAST_30_DAYS",
+        "table_name": "campaign_performance"
+      }
+    ]
+  },
+  "destinationId": "retailpulse-s3-bronze",
+  "destinationConfiguration": {
+    "s3_bucket_name": "${S3_BRONZE_BUCKET}",
+    "s3_bucket_path": "bronze/google_ads",
+    "s3_bucket_region": "us-east-1",
+    "format": {
+      "format_type": "Parquet",
+      "compression_codec": "SNAPPY"
+    }
+  },
+  "schedule": {
+    "scheduleType": "cron",
+    "cronExpression": "0 * * * *"
+  },
+  "syncCatalog": {
+    "streams": [
+      {
+        "stream": {
+          "name": "campaign_performance",
+          "supportedSyncModes": ["full_refresh", "incremental"]
+        },
+        "config": {
+          "syncMode": "incremental",
+          "destinationSyncMode": "append_dedup",
+          "cursorField": ["segments.date"],
+          "primaryKey": [["campaign.id"], ["segments.date"]]
+        }
+      }
+    ]
+  }
+}

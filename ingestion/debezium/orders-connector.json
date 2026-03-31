@@ -1,0 +1,46 @@
+{
+  "name": "retailpulse-orders-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "tasks.max": "1",
+
+    "database.hostname": "postgres-source",
+    "database.port": "5432",
+    "database.user": "retailpulse",
+    "database.password": "${file:/opt/kafka/secrets/postgres.properties:password}",
+    "database.dbname": "retailpulse",
+    "database.server.name": "retailpulse",
+
+    "topic.prefix": "retailpulse",
+    "table.include.list": "public.orders,public.order_items,public.users,public.inventory",
+
+    "slot.name": "retailpulse_debezium",
+    "publication.name": "retailpulse_pub",
+
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+
+    "transforms": "unwrap,addMetadata",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "transforms.unwrap.add.fields": "op,ts_ms,source.db,source.table",
+    "transforms.addMetadata.type": "org.apache.kafka.connect.transforms.InsertField$Value",
+    "transforms.addMetadata.static.field": "pipeline_version",
+    "transforms.addMetadata.static.value": "1.0",
+
+    "heartbeat.interval.ms": "10000",
+    "snapshot.mode": "initial",
+    "snapshot.isolation.mode": "read_committed",
+
+    "errors.tolerance": "all",
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true",
+    "errors.deadletterqueue.topic.name": "retailpulse.dlq",
+    "errors.deadletterqueue.topic.replication.factor": "1",
+    "errors.deadletterqueue.context.headers.enable": "true"
+  }
+}
