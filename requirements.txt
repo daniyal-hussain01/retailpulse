@@ -1,0 +1,15 @@
+# RetailPulse — minimal requirements
+# These are the ONLY packages you need to install.
+# Everything else (sqlite3, hashlib, json, csv, re, uuid…) is built into Python.
+#
+# Install with one command:
+#   pip install -r requirements.txt
+#
+# If you have a venv activated, that same command installs into the venv.
+# If you have no venv (global Python), that same command works too.
+
+Flask>=2.0
+pandas>=1.3
+numpy>=1.21
+confluent-kafka>=2.3       # Required by ingestion/producer.py
+pyarrow>=14.0              # Required for parquet read/write in bronze_to_silver
