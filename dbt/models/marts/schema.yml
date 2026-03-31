@@ -1,0 +1,84 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: >
+      Cleaned order records sourced from Silver parquet layer.
+      PII (user_id) is pre-hashed with SHA-256 before this layer.
+    columns:
+      - name: order_id
+        description: Primary key — UUID from source Postgres orders table.
+        tests:
+          - unique
+          - not_null
+
+      - name: user_id_hash
+        description: SHA-256 hash of user_id + PII salt. Never the raw user_id.
+        tests:
+          - not_null
+
+      - name: order_status
+        description: Current lifecycle status of the order.
+        tests:
+          - not_null
+          - accepted_values:
+              values: [placed, processing, shipped, delivered, refunded, cancelled]
+
+      - name: total_cents
+        description: Total order value in cents (USD). Always positive.
+        tests:
+          - not_null
+
+      - name: currency
+        description: ISO 4217 currency code.
+        tests:
+          - not_null
+          - accepted_values:
+              values: [USD, CAD, GBP, EUR]
+
+  - name: fact_orders
+    description: >
+      Gold layer fact table. One row per order.
+      Source of truth for all revenue reporting.
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+
+      - name: user_id_hash
+        tests:
+          - not_null
+
+      - name: order_status
+        tests:
+          - accepted_values:
+              values: [placed, processing, shipped, delivered, refunded, cancelled]
+
+      - name: total_cents
+        tests:
+          - not_null
+
+      - name: net_revenue_cents
+        description: total_cents minus discount_cents. Used for revenue reporting.
+        tests:
+          - not_null
+
+  - name: agg_daily_revenue
+    description: >
+      Pre-aggregated daily revenue table for BI dashboards.
+      Refreshed on every dbt run.
+    columns:
+      - name: order_date
+        tests:
+          - not_null
+          - unique
+
+      - name: order_count
+        tests:
+          - not_null
+
+      - name: refund_rate_pct
+        description: Percentage of orders refunded or cancelled on this day.
+        tests:
+          - not_null

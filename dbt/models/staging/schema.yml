@@ -1,0 +1,65 @@
+version: 2
+
+sources:
+  - name: silver_orders
+    description: >
+      Silver-layer Parquet files produced by the Bronze→Silver PySpark job.
+      All PII is masked (user_id → user_id_hash) before reaching this layer.
+    tables:
+      - name: orders
+        description: Cleaned, deduped order CDC events.
+        loader: pyspark_bronze_to_silver
+        loaded_at_field: updated_at
+        freshness:
+          warn_after: {count: 1, period: hour}
+          error_after: {count: 6, period: hour}
+
+models:
+  - name: stg_orders
+    description: >
+      Staging view over Silver parquet. Standardises column names,
+      casts types, and applies basic sanity filters.
+      No business logic here — transformations belong in intermediate or marts.
+    config:
+      materialized: view
+    columns:
+      - name: order_id
+        description: UUID primary key from source orders table.
+        tests:
+          - unique
+          - not_null
+
+      - name: user_id_hash
+        description: >
+          SHA-256(PII_SALT | user_id). Used as the stable user identifier
+          throughout the Gold layer. Never the raw user_id.
+        tests:
+          - not_null
+
+      - name: order_status
+        description: Lifecycle status of the order.
+        tests:
+          - not_null
+          - accepted_values:
+              values: [placed, processing, shipped, delivered, refunded, cancelled]
+
+      - name: currency
+        tests:
+          - not_null
+          - accepted_values:
+              values: [USD, CAD, GBP, EUR]
+
+      - name: total_cents
+        description: Total order value in cents. Always > 0 after staging filter.
+        tests:
+          - not_null
+
+      - name: net_revenue_cents
+        description: total_cents minus discount_cents.
+        tests:
+          - not_null
+
+      - name: order_date
+        description: Truncated to day. Used as the partition key in fact_orders.
+        tests:
+          - not_null
