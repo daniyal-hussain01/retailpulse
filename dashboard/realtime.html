@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RetailPulse — Live Pipeline</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0a0c12; --card:#12151f; --card2:#1a1d2a; --border:#232638;
+  --accent:#6366f1; --cyan:#22d3ee; --green:#34d399; --red:#f87171;
+  --amber:#fbbf24; --purple:#a78bfa; --pink:#f472b6;
+  --text:#e2e8f0; --muted:#64748b; --dim:#334155;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;min-height:100vh;overflow-x:hidden}
+
+/* ── Header ── */
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo-row{display:flex;align-items:center;gap:12px}
+.logo{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--cyan));border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff}
+.title{font-size:18px;font-weight:700}
+.subtitle{font-size:11px;color:var(--muted);margin-top:1px}
+.header-right{display:flex;align-items:center;gap:10px}
+.live-pill{display:flex;align-items:center;gap:5px;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);color:var(--green);padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700}
+.pulse{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+.conn-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px;background:rgba(248,113,113,.15);color:var(--red);transition:all .3s}
+.conn-badge.connected{background:rgba(52,211,153,.12);color:var(--green)}
+
+/* ── Layout ── */
+.main{padding:20px 28px;max-width:1600px;margin:0 auto}
+
+/* ── KPI strip ── */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;transition:transform .2s}
+.kpi:hover{transform:translateY(-2px)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,var(--accent))}
+.kpi-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.kpi-value{font-size:26px;font-weight:800;margin:6px 0 2px;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.kpi-sub{font-size:11px;color:var(--muted)}
+.kpi-delta{font-size:11px;font-weight:600;margin-top:3px}
+.up{color:var(--green)} .down{color:var(--red)} .neutral{color:var(--muted)}
+
+/* ── Grid layouts ── */
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.row-main{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.card-title{font-size:13px;font-weight:700;margin-bottom:4px}
+.card-sub{font-size:11px;color:var(--muted);margin-bottom:14px}
+.chart-wrap{position:relative}
+.h200{height:200px}
+.h260{height:260px}
+.h300{height:300px}
+
+/* ── Live feed ── */
+.feed{display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto}
+.feed::-webkit-scrollbar{width:4px}
+.feed::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.feed-item{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;animation:slideIn .25s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.feed-item.churn{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.06)}
+.feed-item.anomaly{border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.06)}
+.feed-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0}
+.feed-body{flex:1;min-width:0}
+.feed-main{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feed-detail{font-size:11px;color:var(--muted);margin-top:2px}
+.feed-right{text-align:right;flex-shrink:0}
+.feed-amount{font-weight:700;font-size:13px}
+.feed-time{font-size:10px;color:var(--dim);margin-top:2px}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.b-green{background:rgba(52,211,153,.15);color:var(--green)}
+.b-blue{background:rgba(99,102,241,.15);color:var(--accent)}
+.b-red{background:rgba(248,113,113,.15);color:var(--red)}
+.b-amber{background:rgba(251,191,36,.15);color:var(--amber)}
+.b-purple{background:rgba(167,139,250,.15);color:var(--purple)}
+
+/* ── Churn gauge ── */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:10px 0}
+.gauge-num{font-size:42px;font-weight:800;letter-spacing:-2px;margin-top:-16px}
+.gauge-label{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ── Pipeline flow ── */
+.pipeline-flow{display:flex;align-items:center;gap:0;margin-bottom:16px;overflow-x:auto}
+.pf-stage{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;min-width:90px;flex-shrink:0}
+.pf-icon{font-size:20px;margin-bottom:4px}
+.pf-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.pf-count{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.pf-arrow{color:var(--border);font-size:18px;padding:0 4px;flex-shrink:0}
+
+/* ── Queue bar ── */
+.queue-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.queue-label{width:90px;font-size:11px;color:var(--muted)}
+.queue-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.queue-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.queue-val{width:45px;font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
+
+/* ── Alerts list ── */
+.alert-item{background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.alert-header{display:flex;justify-content:space-between;margin-bottom:4px}
+.alert-score{font-size:20px;font-weight:800;color:var(--red)}
+.alert-rec{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── Responsive ── */
+@media(max-width:1000px){.row-2,.row-3,.row-main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-row">
+    <div class="logo">R</div>
+    <div>
+      <div class="title">RetailPulse Live Pipeline</div>
+      <div class="subtitle" id="hdr-sub">Connecting to stream…</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span id="conn-badge" class="conn-badge">⚡ Disconnected</span>
+    <div class="live-pill"><div class="pulse"></div>Real-Time</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Pipeline flow diagram -->
+  <div class="card" style="margin-bottom:14px;padding:14px 18px">
+    <div class="card-title" style="margin-bottom:12px">Live Pipeline Flow</div>
+    <div class="pipeline-flow">
+      <div class="pf-stage" id="pf-gen">
+        <div class="pf-icon">📡</div>
+        <div class="pf-name">Generator</div>
+        <div class="pf-count" id="pf-gen-n">0</div>
+      </div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-stage" id="pf-raw">
+        <div class="pf-icon">📥</div>
+        <div class="pf-name">Raw Queue</div>
+        <div class="pf-count" id="pf-raw-n">0</div>
+      </div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-stage" id="pf-proc">
+        <div class="pf-icon">⚙️</div>
+        <div class="pf-name">Processor</div>
+        <div class="pf-count" id="pf-proc-n">0</div>
+      </div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-stage" id="pf-churn">
+        <div class="pf-icon">🧠</div>
+        <div class="pf-name">Churn ML</div>
+        <div class="pf-count" id="pf-churn-n">0</div>
+      </div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-stage" id="pf-db">
+        <div class="pf-icon">💾</div>
+        <div class="pf-name">SQLite</div>
+        <div class="pf-count" id="pf-db-n">—</div>
+      </div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-stage" id="pf-sse">
+        <div class="pf-icon">📺</div>
+        <div class="pf-name">Dashboard</div>
+        <div class="pf-count" id="pf-sse-n">SSE</div>
+      </div>
+    </div>
+    <!-- Queue depth bars -->
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div class="queue-row">
+        <div class="queue-label">Raw queue</div>
+        <div class="queue-bar"><div class="queue-fill" id="qb-raw" style="width:0%;background:var(--amber)"></div></div>
+        <div class="queue-val" id="qv-raw">0</div>
+      </div>
+      <div class="queue-row">
+        <div class="queue-label">Proc queue</div>
+        <div class="queue-bar"><div class="queue-fill" id="qb-proc" style="width:0%;background:var(--accent)"></div></div>
+        <div class="queue-val" id="qv-proc">0</div>
+      </div>
+      <div class="queue-row">
+        <div class="queue-label">Latency</div>
+        <div class="queue-bar"><div class="queue-fill" id="qb-lat" style="width:0%;background:var(--green)"></div></div>
+        <div class="queue-val" id="qv-lat">0ms</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-strip">
+    <div class="kpi" style="--kc:var(--accent)">
+      <div class="kpi-label">Events/sec</div>
+      <div class="kpi-value" id="kpi-eps">0</div>
+      <div class="kpi-sub">Live throughput</div>
+    </div>
+    <div class="kpi" style="--kc:var(--cyan)">
+      <div class="kpi-label">Revenue/min</div>
+      <div class="kpi-value" id="kpi-r1m">$0</div>
+      <div class="kpi-sub">Last 60 seconds</div>
+    </div>
+    <div class="kpi" style="--kc:var(--green)">
+      <div class="kpi-label">Orders/min</div>
+      <div class="kpi-value" id="kpi-o1m">0</div>
+      <div class="kpi-sub">Rolling 1-minute</div>
+    </div>
+    <div class="kpi" style="--kc:var(--red)">
+      <div class="kpi-label">Churn Alerts</div>
+      <div class="kpi-value" id="kpi-alerts">0</div>
+      <div class="kpi-sub">High-risk users</div>
+    </div>
+    <div class="kpi" style="--kc:var(--amber)">
+      <div class="kpi-label">Anomalies</div>
+      <div class="kpi-value" id="kpi-anoms">0</div>
+      <div class="kpi-sub">Auto-detected</div>
+    </div>
+    <div class="kpi" style="--kc:var(--purple)">
+      <div class="kpi-label">Uptime</div>
+      <div class="kpi-value" id="kpi-uptime">0s</div>
+      <div class="kpi-sub">Pipeline runtime</div>
+    </div>
+  </div>
+
+  <!-- Revenue chart + Live feed -->
+  <div class="row-main">
+    <div class="card">
+      <div class="card-title">Live Revenue Stream</div>
+      <div class="card-sub">Rolling 60-second window · updates every event</div>
+      <div class="chart-wrap h260"><canvas id="revChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🚨 Churn Alerts</div>
+      <div class="card-sub">High-risk users (score ≥ 0.70)</div>
+      <div id="churn-alerts-list" style="max-height:280px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- EPS + Churn dist + Channel -->
+  <div class="row-3">
+    <div class="card">
+      <div class="card-title">Events per Second</div>
+      <div class="card-sub">Pipeline throughput trend</div>
+      <div class="chart-wrap h200"><canvas id="epsChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Churn Score Distribution</div>
+      <div class="card-sub">Last 100 scored orders</div>
+      <div class="chart-wrap h200"><canvas id="churnDistChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Orders by Channel</div>
+      <div class="card-sub">Real-time split</div>
+      <div class="chart-wrap h200"><canvas id="channelChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Live order feed + anomalies -->
+  <div class="row-2">
+    <div class="card">
+      <div class="card-title">📦 Live Order Feed</div>
+      <div class="card-sub" id="feed-count">Waiting for events…</div>
+      <div class="feed" id="order-feed"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">⚡ Anomaly Log</div>
+      <div class="card-sub">Auto-detected irregularities</div>
+      <div class="feed" id="anomaly-feed"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── Chart setup ─────────────────────────────────────────────────────────────
+Chart.defaults.color = '#64748b';
+const GRID = {color:'rgba(255,255,255,.04)',borderColor:'rgba(255,255,255,.08)'};
+const TICK = {color:'#64748b'};
+
+// Rolling 60s revenue chart (60 buckets × 1s each)
+const REV_BUCKETS = 60;
+let revData = Array(REV_BUCKETS).fill(0);
+let revLabels = Array.from({length:REV_BUCKETS}, (_,i) => i===0?'now':`${REV_BUCKETS-i}s`).reverse();
+
+const revChart = new Chart(document.getElementById('revChart'), {
+  type:'line',
+  data:{
+    labels: revLabels,
+    datasets:[{
+      label:'Revenue ($)',
+      data: revData,
+      borderColor:'#6366f1',
+      backgroundColor:'rgba(99,102,241,.1)',
+      fill:true, tension:.4, pointRadius:0, borderWidth:2,
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:GRID, ticks:{...TICK, maxTicksLimit:8}},
+      y:{grid:GRID, ticks:{...TICK, callback:v=>'$'+(v/100).toFixed(0)}}
+    }
+  }
+});
+
+// EPS chart (30s rolling)
+const EPS_BUCKETS = 30;
+let epsData   = Array(EPS_BUCKETS).fill(0);
+let epsLabels = Array.from({length:EPS_BUCKETS},()=>'');
+
+const epsChart = new Chart(document.getElementById('epsChart'),{
+  type:'bar',
+  data:{
+    labels:epsLabels,
+    datasets:[{label:'EPS',data:epsData,backgroundColor:'rgba(34,211,238,.7)',borderRadius:3}]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{display:false}},y:{grid:GRID,ticks:TICK}}
+  }
+});
+
+// Churn distribution histogram (buckets 0-.1,.1-.2,...,.9-1.0)
+const churnBuckets = Array(10).fill(0);
+const churnDistChart = new Chart(document.getElementById('churnDistChart'),{
+  type:'bar',
+  data:{
+    labels:['0-.1','.1-.2','.2-.3','.3-.4','.4-.5','.5-.6','.6-.7','.7-.8','.8-.9','.9-1'],
+    datasets:[{
+      label:'Count',
+      data:churnBuckets,
+      backgroundColor: Array.from({length:10},(_,i)=>
+        i>=7 ? 'rgba(248,113,113,.8)' : i>=4 ? 'rgba(251,191,36,.7)' : 'rgba(52,211,153,.7)'),
+      borderRadius:4
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:{duration:300},
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{...TICK,font:{size:10}}},y:{grid:GRID,ticks:TICK}}
+  }
+});
+
+// Channel donut
+const channelCounts = {};
+const channelChart = new Chart(document.getElementById('channelChart'),{
+  type:'doughnut',
+  data:{
+    labels:[],
+    datasets:[{data:[],backgroundColor:['#6366f1','#22d3ee','#f59e0b','#34d399','#f87171'],
+      borderWidth:2, borderColor:'#12151f', hoverOffset:4}]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:{duration:300},
+    cutout:'65%',
+    plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:8,font:{size:10}}}}
+  }
+});
+
+// ── State ────────────────────────────────────────────────────────────────────
+let totalOrders = 0, churnAlerts = 0, anomalyCount = 0;
+let currentRevBucket = 0;
+const ORDER_FEED_MAX = 25;
+const ANOM_FEED_MAX  = 20;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt$ = c => c>=100000 ? '$'+(c/100/1000).toFixed(1)+'K' : '$'+(c/100).toFixed(0);
+const fmtUptime = s => s>3600 ? `${Math.floor(s/3600)}h ${Math.floor(s%3600/60)}m` :
+                       s>60   ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
+
+const STATUS_ICONS = {delivered:'✅',shipped:'🚚',placed:'📦',processing:'⚙️',refunded:'↩️',cancelled:'❌'};
+const TIER_CLASS   = {high:'b-red', mid:'b-amber', low:'b-blue'};
+const CHANNEL_ICONS= {organic:'🌿',paid_search:'🔍',paid_social:'📱',email:'📧',referral:'🤝'};
+
+// ── Handle incoming SSE events ─────────────────────────────────────────────
+function handleEvent(type, data) {
+  if (type === 'snapshot') {
+    // Initial load: populate everything at once
+    if (data.metrics)     updateMetrics(data.metrics);
+    if (data.live_orders) data.live_orders.slice(0,ORDER_FEED_MAX).reverse().forEach(addOrderToFeed);
+    if (data.churn_alerts)data.churn_alerts.forEach(addChurnAlert);
+    if (data.anomalies)   data.anomalies.forEach(a=>addAnomalyToFeed(a));
+    return;
+  }
+  if (type === 'order') {
+    totalOrders++;
+    $('feed-count').textContent = `${totalOrders.toLocaleString()} orders received`;
+    addOrderToFeed(data);
+    updateChurnDist(data.churn_score || 0);
+    updateChannel(data.channel);
+    // Add revenue to current bucket
+    revData[REV_BUCKETS-1] += (data.total_cents || 0);
+    revChart.update('none');
+  }
+  if (type === 'churn_alert') {
+    churnAlerts++;
+    $('kpi-alerts').textContent = churnAlerts;
+    addChurnAlert(data);
+  }
+  if (type === 'anomaly') {
+    anomalyCount++;
+    $('kpi-anoms').textContent = anomalyCount;
+    addAnomalyToFeed(data);
+  }
+  if (type === 'metrics') {
+    updateMetrics(data);
+  }
+}
+
+function updateMetrics(m) {
+  $('kpi-eps').textContent    = (m.events_per_second||0).toFixed(1);
+  $('kpi-r1m').textContent    = fmt$(m.revenue_1m_cents||0);
+  $('kpi-o1m').textContent    = m.orders_1m||0;
+  $('kpi-alerts').textContent = m.churn_alerts_fired||churnAlerts;
+  $('kpi-anoms').textContent  = m.anomalies_detected||anomalyCount;
+  $('kpi-uptime').textContent = fmtUptime(m.uptime_seconds||0);
+
+  // Pipeline flow counts
+  $('pf-gen-n').textContent  = (m.events_generated||0).toLocaleString();
+  $('pf-raw-n').textContent  = m.queue_depth_raw||0;
+  $('pf-proc-n').textContent = (m.events_processed||0).toLocaleString();
+  $('pf-churn-n').textContent= (m.churn_alerts_fired||0)+' 🔔';
+
+  // Queue bars (max 100 shown as 100%)
+  const rawPct  = Math.min(100, (m.queue_depth_raw||0));
+  const procPct = Math.min(100, (m.queue_depth_proc||0));
+  const latPct  = Math.min(100, (m.pipeline_latency_ms||0)/5);
+  $('qb-raw').style.width  = rawPct+'%';
+  $('qb-proc').style.width = procPct+'%';
+  $('qb-lat').style.width  = latPct+'%';
+  $('qv-raw').textContent  = m.queue_depth_raw||0;
+  $('qv-proc').textContent = m.queue_depth_proc||0;
+  $('qv-lat').textContent  = Math.round(m.pipeline_latency_ms||0)+'ms';
+
+  // EPS chart rolling update
+  epsData.shift();
+  epsData.push(parseFloat(m.events_per_second||0));
+  epsChart.update('none');
+
+  // Header subtitle
+  $('hdr-sub').textContent =
+    `${(m.events_processed||0).toLocaleString()} events · `+
+    `${(m.events_per_second||0).toFixed(1)} eps · `+
+    `latency ${Math.round(m.pipeline_latency_ms||0)}ms`;
+}
+
+function addOrderToFeed(o) {
+  const feed = $('order-feed');
+  const score = parseFloat(o.churn_score||0);
+  const scoreColor = score>=0.7 ? '#f87171' : score>=0.4 ? '#fbbf24' : '#34d399';
+  const icon  = STATUS_ICONS[o.status] || '📦';
+  const tier  = o.value_tier || 'low';
+  const ch    = CHANNEL_ICONS[o.channel] || '🌐';
+  const amt   = fmt$(o.total_cents||0);
+  const timeStr = (o.ts||o.occurred_at||'').slice(11,19) || 'now';
+
+  const el = document.createElement('div');
+  el.className = 'feed-item';
+  el.innerHTML = `
+    <div class="feed-icon">${icon}</div>
+    <div class="feed-body">
+      <div class="feed-main">${o.sku||'Order'} · ${ch} ${o.channel||''}</div>
+      <div class="feed-detail">
+        <span class="badge ${TIER_CLASS[tier]||'b-blue'}"><span class="badge-dot"></span>${tier}</span>
+        <span style="margin-left:6px;color:${scoreColor}">churn ${(score*100).toFixed(0)}%</span>
+      </div>
+    </div>
+    <div class="feed-right">
+      <div class="feed-amount">${amt}</div>
+      <div class="feed-time">${timeStr}</div>
+    </div>`;
+
+  feed.insertBefore(el, feed.firstChild);
+  if (feed.children.length > ORDER_FEED_MAX) {
+    feed.removeChild(feed.lastChild);
+  }
+}
+
+function addChurnAlert(a) {
+  const list = $('churn-alerts-list');
+  const score = parseFloat(a.churn_score||0);
+  const el = document.createElement('div');
+  el.className = 'alert-item';
+  el.innerHTML = `
+    <div class="alert-header">
+      <div>
+        <span style="font-size:11px;color:var(--muted);font-family:monospace">${a.user_prefix||'user…'}…</span>
+        <span style="margin-left:8px" class="badge b-red">HIGH RISK</span>
+      </div>
+      <div class="alert-score">${(score*100).toFixed(0)}%</div>
+    </div>
+    <div style="font-size:11px">Orders: <b>${a.orders||'—'}</b> · Spend: <b>${a.total_spend||'—'}</b></div>
+    <div class="alert-rec">${a.recommendation||''}</div>`;
+  list.insertBefore(el, list.firstChild);
+  if (list.children.length > 10) list.removeChild(list.lastChild);
+}
+
+function addAnomalyToFeed(a) {
+  const feed = $('anomaly-feed');
+  const icons = {burst:'⚡',high_value_order:'💰',default:'⚠️'};
+  const icon = icons[a.type] || icons.default;
+  const el = document.createElement('div');
+  el.className = 'feed-item anomaly';
+  el.innerHTML = `
+    <div class="feed-icon">${icon}</div>
+    <div class="feed-body">
+      <div class="feed-main">${a.message||a.type}</div>
+      <div class="feed-detail">${(a.ts||'').slice(11,19)}</div>
+    </div>`;
+  feed.insertBefore(el, feed.firstChild);
+  if (feed.children.length > ANOM_FEED_MAX) feed.removeChild(feed.lastChild);
+}
+
+function updateChurnDist(score) {
+  const bucket = Math.min(9, Math.floor(score * 10));
+  churnBuckets[bucket]++;
+  churnDistChart.data.datasets[0].data = [...churnBuckets];
+  churnDistChart.update('none');
+}
+
+function updateChannel(ch) {
+  if (!ch) return;
+  channelCounts[ch] = (channelCounts[ch]||0) + 1;
+  const entries = Object.entries(channelCounts).sort((a,b)=>b[1]-a[1]);
+  channelChart.data.labels   = entries.map(([k])=>k);
+  channelChart.data.datasets[0].data = entries.map(([,v])=>v);
+  channelChart.update('none');
+}
+
+// Rolling revenue: shift every second
+setInterval(()=>{
+  revData.shift();
+  revData.push(0);
+  revChart.update('none');
+}, 1000);
+
+// ── SSE connection ────────────────────────────────────────────────────────────
+let evtSource = null;
+let reconnectDelay = 1000;
+
+function connect() {
+  if (evtSource) { evtSource.close(); }
+
+  $('conn-badge').textContent = '⏳ Connecting…';
+  $('conn-badge').className   = 'conn-badge';
+
+  evtSource = new EventSource('/stream/events');
+
+  evtSource.onopen = () => {
+    $('conn-badge').textContent = '✅ Connected';
+    $('conn-badge').className   = 'conn-badge connected';
+    reconnectDelay = 1000;
+  };
+
+  evtSource.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'heartbeat') return;
+      handleEvent(msg.type, msg.data || msg);
+    } catch(err) {
+      console.warn('SSE parse error:', err);
+    }
+  };
+
+  evtSource.onerror = () => {
+    $('conn-badge').textContent = '🔴 Reconnecting…';
+    $('conn-badge').className   = 'conn-badge';
+    evtSource.close();
+    setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
+  };
+}
+
+// Start connecting
+connect();
+</script>
+</body>
+</html>

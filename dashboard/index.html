@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetailPulse — Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0f1117;
+    --card:     #1a1d27;
+    --border:   #2a2d3e;
+    --accent1:  #6366f1;
+    --accent2:  #22d3ee;
+    --accent3:  #f59e0b;
+    --accent4:  #34d399;
+    --accent5:  #f87171;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --green:    #34d399;
+    --red:      #f87171;
+    --yellow:   #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ────────────────────────────────────────── */
+  .header {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: #fff;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .header p { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(52,211,153,0.12);
+    border: 1px solid rgba(52,211,153,0.3);
+    color: var(--green);
+    padding: 5px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--green); border-radius: 50%;
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+
+  /* ── Nav tabs ────────────────────────────────────────── */
+  .nav {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex; gap: 4px;
+  }
+  .nav-btn {
+    padding: 12px 20px;
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); cursor: pointer;
+    font-size: 13px; font-weight: 500;
+    transition: all .2s; white-space: nowrap;
+  }
+  .nav-btn:hover { color: var(--text); }
+  .nav-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* ── Layout ──────────────────────────────────────────── */
+  .main { padding: 28px 32px; max-width: 1600px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── KPI cards ──────────────────────────────────────── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 28px;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative; overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent-color, var(--accent1));
+  }
+  .kpi-icon { font-size: 22px; margin-bottom: 12px; }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+  .kpi-value { font-size: 28px; font-weight: 800; margin: 6px 0 4px; letter-spacing: -1px; }
+  .kpi-change {
+    font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .kpi-change.up { color: var(--green); }
+  .kpi-change.down { color: var(--red); }
+  .kpi-change.neutral { color: var(--muted); }
+
+  /* ── Charts ─────────────────────────────────────────── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px; margin-bottom: 16px;
+  }
+  .charts-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px; margin-bottom: 16px;
+  }
+  .charts-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-bottom: 16px;
+  }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+  }
+  .chart-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 18px;
+  }
+  .chart-title { font-size: 14px; font-weight: 700; }
+  .chart-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .chart-badge {
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 12px;
+    background: rgba(99,102,241,.15); color: var(--accent1);
+  }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap-sm { position: relative; height: 180px; }
+  .chart-wrap-lg { position: relative; height: 280px; }
+
+  /* ── Table ───────────────────────────────────────────── */
+  .table-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .table-header {
+    padding: 18px 22px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    padding: 11px 16px; text-align: left;
+    font-size: 11px; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+    background: rgba(255,255,255,.02);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 12px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.03); }
+
+  /* ── Status badges ───────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 700;
+  }
+  .badge.green  { background: rgba(52,211,153,.15); color: var(--green); }
+  .badge.red    { background: rgba(248,113,113,.15); color: var(--red); }
+  .badge.yellow { background: rgba(251,191,36,.15);  color: var(--yellow); }
+  .badge.blue   { background: rgba(99,102,241,.15);  color: var(--accent1); }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ── Heatmap ─────────────────────────────────────────── */
+  .heatmap-grid {
+    display: grid; gap: 3px;
+    grid-template-columns: 60px repeat(12, 1fr);
+    font-size: 11px;
+  }
+  .heatmap-cell {
+    aspect-ratio: 1; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600;
+    color: rgba(255,255,255,.8);
+    transition: transform .15s;
+    cursor: default;
+  }
+  .heatmap-cell:hover { transform: scale(1.15); z-index: 2; }
+  .heatmap-label { color: var(--muted); padding: 4px; font-size: 10px; display: flex; align-items: center; }
+
+  /* ── Pipeline status ─────────────────────────────────── */
+  .pipeline-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .pipeline-row:last-child { border-bottom: none; }
+  .p-icon { font-size: 18px; width: 32px; }
+  .p-name { font-weight: 600; font-size: 13px; flex: 1; }
+  .p-detail { font-size: 11px; color: var(--muted); }
+  .p-time { font-size: 11px; color: var(--muted); min-width: 80px; text-align: right; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+
+  /* ── Gauge ───────────────────────────────────────────── */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; padding: 8px 0; }
+  .gauge-value { font-size: 32px; font-weight: 800; margin-top: -20px; }
+  .gauge-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Responsive ──────────────────────────────────────── */
+  @media(max-width:900px) {
+    .charts-grid, .charts-grid-3, .charts-grid-2 { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2,1fr); }
+    .main { padding: 16px; }
+    .header { padding: 14px 16px; }
+    .nav { padding: 0 16px; }
+  }
+
+  /* ── Scrollbar ───────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Tooltip ─────────────────────────────────────────── */
+  .tooltip-custom {
+    position: absolute; background: #1e2130; border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; font-size: 12px;
+    pointer-events: none; z-index: 999; white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  }
+
+  /* ── Spark lines (inline mini charts) ───────────────── */
+  .spark { display: inline-block; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">R</div>
+    <div>
+      <h1>RetailPulse Analytics</h1>
+      <p id="last-updated">Last updated: just now</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <select id="date-range" onchange="refreshAll()" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:8px;font-size:13px;cursor:pointer">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <div class="live-badge"><div class="live-dot"></div>Live</div>
+  </div>
+</div>
+
+<!-- ── Nav ────────────────────────────────────────────────── -->
+<div class="nav">
+  <button class="nav-btn active" onclick="showTab('overview',this)">📊 Overview</button>
+  <button class="nav-btn" onclick="showTab('revenue',this)">💰 Revenue</button>
+  <button class="nav-btn" onclick="showTab('customers',this)">👥 Customers</button>
+  <button class="nav-btn" onclick="showTab('inventory',this)">📦 Inventory</button>
+  <button class="nav-btn" onclick="showTab('pipeline',this)">⚙️ Pipeline</button>
+</div>
+
+<!-- ═══════════════ OVERVIEW TAB ═══════════════════════════ -->
+<div class="main">
+<div id="tab-overview" class="tab-panel active">
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--accent-color:#6366f1">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-label">Gross Revenue (30d)</div>
+      <div class="kpi-value" id="kpi-gmv">$0</div>
+      <div class="kpi-change up" id="kpi-gmv-chg">▲ —</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#22d3ee">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-label">Total Orders</div>
+      <div class="kpi-value" id="kpi-orders">0</div>
+      <div class="kpi-change up" id="kpi-orders-chg">▲ —</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#34d399">
+      <div class="kpi-icon">🛒</div>
+      <div class="kpi-label">Avg Order Value</div>
+      <div class="kpi-value" id="kpi-aov">$0</div>
+      <div class="kpi-change neutral" id="kpi-aov-chg">— —</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f59e0b">
+      <div class="kpi-icon">👥</div>
+      <div class="kpi-label">Unique Buyers</div>
+      <div class="kpi-value" id="kpi-buyers">0</div>
+      <div class="kpi-change up" id="kpi-buyers-chg">▲ —</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f87171">
+      <div class="kpi-icon">↩️</div>
+      <div class="kpi-label">Refund Rate</div>
+      <div class="kpi-value" id="kpi-refund">0%</div>
+      <div class="kpi-change down" id="kpi-refund-chg">▼ —</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#a78bfa">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-label">Fulfilment Rate</div>
+      <div class="kpi-value" id="kpi-fulfil">0%</div>
+      <div class="kpi-change up" id="kpi-fulfil-chg">▲ —</div>
+    </div>
+  </div>
+
+  <!-- Revenue trend + Donut -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div><div class="chart-title">Daily Revenue Trend</div><div class="chart-sub">Gross vs Net revenue</div></div>
+        <span class="chart-badge">30 days</span>
+      </div>
+      <div class="chart-wrap-lg"><canvas id="revTrendChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div><div class="chart-title">Revenue by Channel</div><div class="chart-sub">Order acquisition source</div></div>
+      </div>
+      <div class="chart-wrap-lg"><canvas id="channelChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 3-column row -->
+  <div class="charts-grid-3">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Orders by Status</div><div class="chart-sub">Current breakdown</div></div></div>
+      <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Hourly Order Volume</div><div class="chart-sub">Today vs yesterday</div></div></div>
+      <div class="chart-wrap"><canvas id="hourlyChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">AOV Distribution</div><div class="chart-sub">Order value buckets</div></div></div>
+      <div class="chart-wrap"><canvas id="aovChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Recent orders table -->
+  <div class="table-card">
+    <div class="table-header">
+      <div><div class="chart-title">Recent Orders</div><div class="chart-sub">Last 10 transactions</div></div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Order ID</th><th>Status</th><th>Amount</th><th>Channel</th><th>Warehouse</th><th>Created</th>
+      </tr></thead>
+      <tbody id="orders-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ REVENUE TAB ════════════════════════════ -->
+<div id="tab-revenue" class="tab-panel">
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--accent-color:#6366f1">
+      <div class="kpi-icon">📈</div><div class="kpi-label">Net Revenue (30d)</div>
+      <div class="kpi-value" id="r-net">$0</div><div class="kpi-change up">▲ 12.4% vs prior period</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#22d3ee">
+      <div class="kpi-icon">🎁</div><div class="kpi-label">Total Discounts Given</div>
+      <div class="kpi-value" id="r-disc">$0</div><div class="kpi-change neutral">— 8.1% discount rate</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#34d399">
+      <div class="kpi-icon">🚚</div><div class="kpi-label">Shipping Revenue</div>
+      <div class="kpi-value" id="r-ship">$0</div><div class="kpi-change up">▲ 3.2%</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f59e0b">
+      <div class="kpi-icon">📅</div><div class="kpi-label">Best Day Revenue</div>
+      <div class="kpi-value" id="r-best">$0</div><div class="kpi-change neutral">— peak day</div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Weekly Revenue Bars</div><div class="chart-sub">Gross / Net / Discount breakdown</div></div></div>
+      <div class="chart-wrap-lg"><canvas id="weeklyRevChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Revenue by Order Value Tier</div><div class="chart-sub">Low / Mid / High AOV</div></div></div>
+      <div class="chart-wrap-lg"><canvas id="tierChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-card" style="margin-bottom:16px">
+    <div class="chart-header"><div><div class="chart-title">Cumulative Revenue (MoM)</div><div class="chart-sub">Month-to-date vs prior month</div></div></div>
+    <div class="chart-wrap-lg"><canvas id="cumulChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══════════════ CUSTOMERS TAB ══════════════════════════ -->
+<div id="tab-customers" class="tab-panel">
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--accent-color:#6366f1">
+      <div class="kpi-icon">🆕</div><div class="kpi-label">New Customers (30d)</div>
+      <div class="kpi-value">1,284</div><div class="kpi-change up">▲ 18.3%</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f87171">
+      <div class="kpi-icon">⚠️</div><div class="kpi-label">Churn Risk (High)</div>
+      <div class="kpi-value">342</div><div class="kpi-change down">▼ 5.1% this week</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#34d399">
+      <div class="kpi-icon">🔁</div><div class="kpi-label">Repeat Purchase Rate</div>
+      <div class="kpi-value">41%</div><div class="kpi-change up">▲ 2.4pp</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f59e0b">
+      <div class="kpi-icon">💎</div><div class="kpi-label">Avg Customer LTV</div>
+      <div class="kpi-value">$284</div><div class="kpi-change up">▲ 7.2%</div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Cohort Retention Heatmap</div><div class="chart-sub">% of cohort still active by month</div></div></div>
+      <div id="heatmap-container" style="padding:8px 0"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Churn Risk Distribution</div><div class="chart-sub">RFM model output</div></div></div>
+      <div class="chart-wrap"><canvas id="churnChart"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid-2">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Customer Acquisition by Channel</div><div class="chart-sub">New users per channel (30d)</div></div></div>
+      <div class="chart-wrap"><canvas id="acqChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">LTV Segment Mix</div><div class="chart-sub">Low / Mid / High value customers</div></div></div>
+      <div class="chart-wrap"><canvas id="ltvChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ INVENTORY TAB ══════════════════════════ -->
+<div id="tab-inventory" class="tab-panel">
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--accent-color:#f87171">
+      <div class="kpi-icon">🚨</div><div class="kpi-label">Stockout Risk (SKUs)</div>
+      <div class="kpi-value">12</div><div class="kpi-change down">▼ from 18 last week</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#22d3ee">
+      <div class="kpi-icon">📊</div><div class="kpi-label">Avg Sell-Through (7d)</div>
+      <div class="kpi-value">68%</div><div class="kpi-change up">▲ 4.1pp</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#34d399">
+      <div class="kpi-icon">🔮</div><div class="kpi-label">Forecast Accuracy</div>
+      <div class="kpi-value">84%</div><div class="kpi-change up">▲ Prophet model</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f59e0b">
+      <div class="kpi-icon">🏭</div><div class="kpi-label">Warehouses Active</div>
+      <div class="kpi-value">3</div><div class="kpi-change neutral">— all healthy</div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">30-Day Demand Forecast</div><div class="chart-sub">Prophet model · 80% CI shading</div></div></div>
+      <div class="chart-wrap-lg"><canvas id="forecastChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Sell-Through by Category</div><div class="chart-sub">7-day velocity</div></div></div>
+      <div class="chart-wrap-lg"><canvas id="sellChart"></canvas></div>
+    </div>
+  </div>
+  <div class="table-card">
+    <div class="table-header"><div><div class="chart-title">Inventory Health by SKU</div><div class="chart-sub">Top risk items</div></div></div>
+    <table>
+      <thead><tr><th>SKU</th><th>Category</th><th>Stock</th><th>Reorder Point</th><th>Days Remaining</th><th>Status</th><th>Velocity</th></tr></thead>
+      <tbody id="inv-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ PIPELINE TAB ═══════════════════════════ -->
+<div id="tab-pipeline" class="tab-panel">
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--accent-color:#34d399">
+      <div class="kpi-icon">✅</div><div class="kpi-label">Pipeline SLA (30d)</div>
+      <div class="kpi-value">99.7%</div><div class="kpi-change up">▲ Target: 99.5%</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#22d3ee">
+      <div class="kpi-icon">⏱️</div><div class="kpi-label">Avg Latency</div>
+      <div class="kpi-value">8.2m</div><div class="kpi-change up">▲ Target: &lt;15m</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f59e0b">
+      <div class="kpi-icon">📨</div><div class="kpi-label">Kafka Lag</div>
+      <div class="kpi-value">1.2K</div><div class="kpi-change neutral">— normal</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#6366f1">
+      <div class="kpi-icon">🗄️</div><div class="kpi-label">Silver Records (today)</div>
+      <div class="kpi-value">48.2K</div><div class="kpi-change up">▲ 12% vs avg</div>
+    </div>
+  </div>
+  <div class="charts-grid-2">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Daily Pipeline Runs</div><div class="chart-sub">Success / Failure / Retry</div></div></div>
+      <div class="chart-wrap"><canvas id="pipelineChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Data Freshness</div><div class="chart-sub">Age of each layer in minutes</div></div></div>
+      <div class="chart-wrap"><canvas id="freshnessChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-card" style="margin-bottom:16px;padding:22px">
+    <div class="chart-title" style="margin-bottom:20px">DAG Run Status — Last 24h</div>
+    <div id="dag-status"></div>
+  </div>
+  <div class="charts-grid-2">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Data Quality Checks</div><div class="chart-sub">Pass / Fail per suite run</div></div></div>
+      <div class="chart-wrap"><canvas id="dqChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Record Volume Trend</div><div class="chart-sub">Bronze → Silver → Gold per day</div></div></div>
+      <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+
+// ── Real API integration ──────────────────────────────────────────────────────
+const API = window.location.origin + "/api";
+async function apiFetch(path) {
+  try { const r = await fetch(API+path); return r.ok ? await r.json() : null; }
+  catch(e) { return null; }
+}
+async function loadKPIsFromAPI() {
+  const days = document.getElementById("date-range").value;
+  const s = await apiFetch("/metrics/summary?days="+days);
+  if (!s) return;
+  const g = s.gross_revenue_cents||0, n = s.net_revenue_cents||0, aov = s.avg_order_value_cents||0;
+  const setT = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  setT("kpi-gmv",   "$"+(g/100/1000).toFixed(1)+"K");
+  setT("kpi-orders", fmtN(s.total_orders||0));
+  setT("kpi-aov",   "$"+(aov/100).toFixed(0));
+  setT("kpi-refund",(s.avg_refund_rate_pct||0).toFixed(1)+"%");
+  const fil = s.total_orders>0 ? ((s.delivered_count/s.total_orders)*100).toFixed(1)+"%" : "—";
+  setT("kpi-fulfil", fil);
+  setT("r-net",  "$"+(n/100/1000).toFixed(1)+"K");
+  setT("r-disc", "$"+((s.discount_cents||0)/100/1000).toFixed(1)+"K");
+  setT("r-ship", "$"+((s.total_orders||0)*4.99/1000).toFixed(1)+"K");
+}
+async function loadRevChartFromAPI() {
+  const days = document.getElementById("date-range").value;
+  const data = await apiFetch("/metrics/daily-revenue?limit="+days);
+  if (!data||!data.length) return false;
+  const sorted = [...data].reverse();
+  destroyChart("revTrend");
+  charts["revTrend"] = new Chart(document.getElementById("revTrendChart"), {
+    type:"line",
+    data:{ labels: sorted.map(r=>r.order_date.slice(5)),
+      datasets:[
+        {label:"Gross Revenue", data:sorted.map(r=>r.gross_revenue_cents/100), borderColor:"#6366f1", backgroundColor:"rgba(99,102,241,.12)", fill:true, tension:.4, pointRadius:2},
+        {label:"Net Revenue",   data:sorted.map(r=>r.net_revenue_cents/100),   borderColor:"#22d3ee", backgroundColor:"rgba(34,211,238,.08)", fill:true, tension:.4, pointRadius:2}
+      ]},
+    options:{...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      plugins:{...CHART_DEFAULTS.plugins, tooltip:{callbacks:{label:c=>" $"+(c.raw/1000).toFixed(1)+"K"}}}}
+  });
+  return true;
+}
+async function loadChannelFromAPI() {
+  const days = document.getElementById("date-range").value;
+  const data = await apiFetch("/metrics/revenue-by-channel?days="+days);
+  if (!data||!data.length) return false;
+  destroyChart("channel");
+  charts["channel"] = new Chart(document.getElementById("channelChart"), {
+    type:"doughnut",
+    data:{ labels:data.map(r=>r.channel),
+      datasets:[{data:data.map(r=>r.revenue_cents), backgroundColor:["#6366f1","#22d3ee","#f59e0b","#34d399","#f87171"], borderWidth:2, borderColor:"#1a1d27", hoverOffset:6}]},
+    options:{responsive:true, maintainAspectRatio:false, cutout:"68%",
+      plugins:{legend:{position:"bottom", labels:{color:"#94a3b8", padding:12, font:{size:11}}}}}
+  });
+  return true;
+}
+async function loadPipelineFromAPI() {
+  const [status, hist] = await Promise.all([apiFetch("/pipeline/status"), apiFetch("/pipeline/history")]);
+  if (status && status.tasks) {
+    const icons = {produce_events:"📤",bronze_to_silver:"⚙️",dbt_run:"🔧",dbt_test:"✅",data_quality:"🔍",done:"🏁"};
+    let html="";
+    status.tasks.forEach(t => {
+      const cl=t.status==="success"?"green":"red";
+      const dur=t.duration_s, ts=dur<60?dur+"s":Math.floor(dur/60)+"m "+dur%60+"s";
+      const pct=Math.min(100,Math.round(dur/300*100)), col=cl==="green"?"#34d399":"#f87171";
+      html+=`<div class="pipeline-row"><div class="p-icon">${icons[t.task_name]||"▶"}</div><div style="flex:1"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span class="p-name">${t.task_name}</span><span class="badge ${cl}"><span class="badge-dot"></span>${t.status==="success"?"Success":"Failed"}</span></div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${col}"></div></div></div><div class="p-time">${ts}</div></div>`;
+    });
+    const el=document.getElementById("dag-status"); if(el) el.innerHTML=html;
+  }
+  if (hist && hist.length) {
+    destroyChart("pipeline");
+    const sorted=[...hist].reverse();
+    charts["pipeline"]=new Chart(document.getElementById("pipelineChart"),{
+      type:"bar", data:{labels:sorted.map(r=>r.run_date.slice(5)),
+        datasets:[{label:"Success",data:sorted.map(r=>r.success_count),backgroundColor:"#34d399",borderRadius:4},{label:"Failed",data:sorted.map(r=>r.failed_count),backgroundColor:"#f87171",borderRadius:4}]},
+      options:{...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false}
+    });
+  }
+}
+async function loadInventoryFromAPI() {
+  const data = await apiFetch("/metrics/inventory");
+  if (!data) return false;
+  let rows="";
+  data.forEach(r => {
+    const cl=r.status==="critical"?"red":r.status==="warning"?"yellow":"green";
+    const lbl=r.status==="critical"?"Critical":r.status==="warning"?"Monitor":"Healthy";
+    const col=cl==="red"?"#f87171":cl==="yellow"?"#fbbf24":"#34d399";
+    rows+=`<tr><td style="font-family:monospace;font-size:12px;color:#818cf8">${r.sku}</td><td>${r.category}</td><td style="font-weight:700">${r.qty_on_hand}</td><td style="color:#94a3b8">${r.reorder_point}</td><td style="font-weight:600;color:${col}">${r.days_remaining} days</td><td><span class="badge ${cl}"><span class="badge-dot"></span>${lbl}</span></td><td style="color:#94a3b8">${r.sell_through_7d.toFixed(1)}%</td></tr>`;
+  });
+  const el=document.getElementById("inv-tbody"); if(el) el.innerHTML=rows;
+  return true;
+}
+async function loadOrdersFromAPI() {
+  const data = await apiFetch("/orders?limit=10");
+  if (!data) return false;
+  const sc={delivered:"green",shipped:"blue",processing:"yellow",refunded:"red",placed:"blue",cancelled:"red"};
+  let rows="";
+  data.forEach(r=>{
+    const cl=sc[r.order_status]||"blue", amt="$"+(r.total_cents/100).toFixed(2);
+    rows+=`<tr><td style="font-family:monospace;font-size:12px;color:#818cf8">${r.order_id.slice(0,8)}…</td><td><span class="badge ${cl}"><span class="badge-dot"></span>${r.order_status}</span></td><td style="font-weight:700">${amt}</td><td style="color:#94a3b8">${r.channel||"—"}</td><td style="color:#94a3b8">${r.warehouse_id||"—"}</td><td style="color:#64748b">${(r.created_at||"").slice(11,16)}</td></tr>`;
+  });
+  const el=document.getElementById("orders-tbody"); if(el) el.innerHTML=rows;
+  return true;
+}
+
+// ── Utility helpers ──────────────────────────────────────────────────────────
+const rand  = (lo, hi) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
+const randF = (lo, hi, dp=1) => parseFloat((Math.random()*(hi-lo)+lo).toFixed(dp));
+const fmt$  = (n) => n >= 1000 ? '$' + (n/1000).toFixed(1) + 'K' : '$' + n.toFixed(0);
+const fmtN  = (n) => n >= 1000 ? (n/1000).toFixed(1) + 'K' : String(n);
+const last7 = () => Array.from({length:7}, (_,i)=>{const d=new Date(); d.setDate(d.getDate()-6+i); return d.toLocaleDateString('en',{month:'short',day:'numeric'});});
+const last30= () => Array.from({length:30},(_,i)=>{const d=new Date(); d.setDate(d.getDate()-29+i); return d.toLocaleDateString('en',{month:'short',day:'numeric'});});
+const last90= () => Array.from({length:90},(_,i)=>{const d=new Date(); d.setDate(d.getDate()-89+i); return d.toLocaleDateString('en',{month:'short',day:'numeric'});});
+
+const CHART_DEFAULTS = {
+  plugins: { legend: { labels: { color:'#94a3b8', font:{size:12}, boxWidth:12 }}},
+  scales: {
+    x: { ticks:{color:'#64748b',maxTicksLimit:8}, grid:{color:'rgba(255,255,255,.04)'}, border:{color:'rgba(255,255,255,.08)'}},
+    y: { ticks:{color:'#64748b'}, grid:{color:'rgba(255,255,255,.06)'}, border:{color:'rgba(255,255,255,.08)'}}
+  }
+};
+
+Chart.defaults.color = '#94a3b8';
+const charts = {};
+
+function destroyChart(id) { if(charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+// ── Data generators ────────────────────────────────────────────────────────
+function genRevSeries(n, base=8000, noise=3000) {
+  let v = base;
+  return Array.from({length:n}, () => {
+    v += rand(-noise, noise + 200); v = Math.max(2000, v);
+    return v;
+  });
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(() => initTab(id), 50);
+}
+
+// ── KPI updater ─────────────────────────────────────────────────────────────
+function updateKPIs() {
+  const days = parseInt(document.getElementById('date-range').value);
+  const scale = days / 30;
+  const gmv    = rand(180000, 320000) * scale;
+  const orders = rand(1800, 4200) * scale;
+  const buyers = rand(900, 2100) * scale;
+  const aov    = gmv / orders;
+  const refund = randF(1.8, 4.2);
+  const fulfil = randF(91, 97);
+
+  document.getElementById('kpi-gmv').textContent    = '$' + (gmv/1000).toFixed(1)+'K';
+  document.getElementById('kpi-orders').textContent  = fmtN(Math.round(orders));
+  document.getElementById('kpi-aov').textContent     = '$' + aov.toFixed(0);
+  document.getElementById('kpi-buyers').textContent  = fmtN(Math.round(buyers));
+  document.getElementById('kpi-refund').textContent  = refund.toFixed(1)+'%';
+  document.getElementById('kpi-fulfil').textContent  = fulfil.toFixed(1)+'%';
+  document.getElementById('kpi-gmv-chg').textContent    = '▲ ' + randF(5,18) + '% vs prior';
+  document.getElementById('kpi-orders-chg').textContent = '▲ ' + randF(3,14) + '% vs prior';
+  document.getElementById('kpi-aov-chg').textContent    = (Math.random()>.5?'▲ ':'▼ ') + randF(0,6) + '% vs prior';
+  document.getElementById('kpi-buyers-chg').textContent = '▲ ' + randF(4,12) + '% vs prior';
+  document.getElementById('kpi-refund-chg').textContent = '▼ ' + randF(0.2,0.8).toFixed(1) + 'pp vs prior';
+  document.getElementById('kpi-fulfil-chg').textContent = '▲ ' + randF(0.5,2.5).toFixed(1) + 'pp vs prior';
+  document.getElementById('r-net').textContent  = '$' + (gmv*0.91/1000).toFixed(1)+'K';
+  document.getElementById('r-disc').textContent = '$' + (gmv*0.08/1000).toFixed(1)+'K';
+  document.getElementById('r-ship').textContent = '$' + (orders*4.99/1000).toFixed(1)+'K';
+  document.getElementById('r-best').textContent = '$' + rand(12,22)+'K';
+}
+
+// ── Overview charts ──────────────────────────────────────────────────────────
+function initOverview() {
+  // Try real API first; fall back to synthetic if not available
+  Promise.all([loadKPIsFromAPI(), loadRevChartFromAPI(), loadChannelFromAPI(), loadOrdersFromAPI()]).then(results => {
+    if (!results[1]) { /* rev chart failed, draw synthetic below */ }
+  });
+
+  const days = parseInt(document.getElementById('date-range').value);
+  const labels = days===7 ? last7() : days===30 ? last30() : last90();
+
+  // Revenue trend
+  destroyChart('revTrend');
+  const gross = genRevSeries(labels.length, 10000, 4000);
+  const net   = gross.map(v => v * randF(0.88,0.93));
+  charts['revTrend'] = new Chart(document.getElementById('revTrendChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Gross Revenue', data:gross, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.12)', fill:true, tension:.4, pointRadius:2 },
+        { label:'Net Revenue',   data:net,   borderColor:'#22d3ee', backgroundColor:'rgba(34,211,238,.08)', fill:true, tension:.4, pointRadius:2 }
+      ]
+    },
+    options: { ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      plugins:{ ...CHART_DEFAULTS.plugins, tooltip:{ callbacks:{ label: ctx => ' $'+(ctx.raw/1000).toFixed(1)+'K' }}}}
+  });
+
+  // Channel donut
+  destroyChart('channel');
+  charts['channel'] = new Chart(document.getElementById('channelChart'), {
+    type:'doughnut',
+    data:{ labels:['Organic','Paid Search','Paid Social','Email','Referral'],
+      datasets:[{ data:[34,28,18,12,8], backgroundColor:['#6366f1','#22d3ee','#f59e0b','#34d399','#f87171'],
+        borderWidth:2, borderColor:'#1a1d27', hoverOffset:6 }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'68%',
+      plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8', padding:12, font:{size:11} }}}}
+  });
+
+  // Status doughnut
+  destroyChart('status');
+  charts['status'] = new Chart(document.getElementById('statusChart'), {
+    type:'doughnut',
+    data:{ labels:['Delivered','Shipped','Processing','Placed','Refunded'],
+      datasets:[{ data:[52,18,14,10,6], backgroundColor:['#34d399','#22d3ee','#6366f1','#f59e0b','#f87171'],
+        borderWidth:2, borderColor:'#1a1d27', hoverOffset:4 }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'65%',
+      plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8', padding:8, font:{size:11} }}}}
+  });
+
+  // Hourly bar
+  destroyChart('hourly');
+  const hours = Array.from({length:24}, (_,i) => `${i}:00`);
+  const today = Array.from({length:24}, () => rand(20,180));
+  const yest  = Array.from({length:24}, () => rand(15,160));
+  charts['hourly'] = new Chart(document.getElementById('hourlyChart'), {
+    type:'bar',
+    data:{ labels:hours, datasets:[
+      { label:'Today',     data:today, backgroundColor:'rgba(99,102,241,.7)',  borderRadius:3 },
+      { label:'Yesterday', data:yest,  backgroundColor:'rgba(99,102,241,.25)', borderRadius:3 }
+    ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false, barPercentage:.7 }
+  });
+
+  // AOV histogram
+  destroyChart('aov');
+  charts['aov'] = new Chart(document.getElementById('aovChart'), {
+    type:'bar',
+    data:{ labels:['<$10','$10-25','$25-50','$50-100','$100-200','$200+'],
+      datasets:[{ label:'Orders', data:[rand(80,150),rand(200,320),rand(380,520),rand(280,400),rand(120,200),rand(40,90)],
+        backgroundColor:['#6366f1','#818cf8','#a5b4fc','#c7d2fe','#ddd6fe','#ede9fe'],
+        borderRadius:5 }]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }}}
+  });
+
+  // Orders table
+  const statuses = [['Delivered','green'],['Shipped','blue'],['Processing','yellow'],['Refunded','red'],['Placed','blue']];
+  const channels = ['Organic','Paid Search','Email','Referral','Paid Social'];
+  const warehouses = ['East Coast Hub','West Coast Hub','Central Hub'];
+  let rows = '';
+  for(let i=0;i<10;i++){
+    const [st, cl] = statuses[rand(0,4)];
+    const amount = '$' + (rand(15,280) + 0.99).toFixed(2);
+    const hrs = rand(0,23), mins = rand(0,59);
+    rows += `<tr>
+      <td style="font-family:monospace;font-size:12px;color:#818cf8">ORD-${rand(10000,99999)}</td>
+      <td><span class="badge ${cl}"><span class="badge-dot"></span>${st}</span></td>
+      <td style="font-weight:700">${amount}</td>
+      <td style="color:#94a3b8">${channels[rand(0,4)]}</td>
+      <td style="color:#94a3b8">${warehouses[rand(0,2)]}</td>
+      <td style="color:#64748b">${hrs}:${String(mins).padStart(2,'0')} today</td>
+    </tr>`;
+  }
+  document.getElementById('orders-tbody').innerHTML = rows;
+}
+
+// ── Revenue charts ────────────────────────────────────────────────────────────
+function initRevenue() {
+  const wks = ['W1','W2','W3','W4','W5'];
+  destroyChart('weeklyRev');
+  const gross = wks.map(()=>rand(40000,90000));
+  const net   = gross.map(v=>Math.round(v*.91));
+  const disc  = gross.map(v=>Math.round(v*.08));
+  charts['weeklyRev'] = new Chart(document.getElementById('weeklyRevChart'), {
+    type:'bar',
+    data:{ labels:wks, datasets:[
+      { label:'Gross', data:gross, backgroundColor:'#6366f1', borderRadius:6 },
+      { label:'Net',   data:net,   backgroundColor:'#22d3ee', borderRadius:6 },
+      { label:'Discount', data:disc, backgroundColor:'#f87171', borderRadius:6 }
+    ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false }
+  });
+
+  destroyChart('tier');
+  charts['tier'] = new Chart(document.getElementById('tierChart'), {
+    type:'doughnut',
+    data:{ labels:['High AOV ($100+)','Mid AOV ($30-100)','Low AOV (<$30)'],
+      datasets:[{ data:[rand(30,40),rand(40,50),rand(15,25)],
+        backgroundColor:['#6366f1','#22d3ee','#f59e0b'], borderWidth:2, borderColor:'#1a1d27' }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
+      plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8' }}}}
+  });
+
+  destroyChart('cumul');
+  const days30 = Array.from({length:30},(_,i)=>i+1);
+  let cur=0, prv=0;
+  const curMo = days30.map(()=>{ cur+=rand(3000,9000); return cur; });
+  const prvMo = days30.map(()=>{ prv+=rand(2500,8000); return prv; });
+  charts['cumul'] = new Chart(document.getElementById('cumulChart'), {
+    type:'line',
+    data:{ labels:days30.map(d=>'Day '+d), datasets:[
+      { label:'This month', data:curMo, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.1)', fill:true, tension:.4, pointRadius:0 },
+      { label:'Last month', data:prvMo, borderColor:'#64748b', backgroundColor:'transparent', borderDash:[5,3], tension:.4, pointRadius:0 }
+    ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      plugins:{ ...CHART_DEFAULTS.plugins, tooltip:{ callbacks:{ label: c=>' $'+(c.raw/1000).toFixed(1)+'K' }}}}
+  });
+}
+
+// ── Customer charts ───────────────────────────────────────────────────────────
+function initCustomers() {
+  // Cohort heatmap
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const cohorts = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
+  function retVal(cohort, period) {
+    if(period === 0) return 100;
+    const base = 100 - period * rand(8,15);
+    return Math.max(0, base + rand(-5,5));
+  }
+  function heatColor(v) {
+    if(v===0) return '#1a1d27';
+    if(v>=80) return '#1d4ed8';
+    if(v>=60) return '#2563eb';
+    if(v>=40) return '#3b82f6';
+    if(v>=25) return '#60a5fa';
+    if(v>=10) return '#93c5fd';
+    return '#bfdbfe';
+  }
+  let html = '<div class="heatmap-grid">';
+  html += '<div class="heatmap-label"></div>';
+  for(let p=0;p<12;p++) html += `<div class="heatmap-label" style="justify-content:center">M+${p}</div>`;
+  cohorts.forEach(c => {
+    html += `<div class="heatmap-label">${c}</div>`;
+    for(let p=0;p<12;p++){
+      const v = retVal(c,p);
+      const col = heatColor(v);
+      html += `<div class="heatmap-cell" style="background:${col}" title="${c} cohort, M+${p}: ${v}%">${v>0?v+'%':''}</div>`;
+    }
+  });
+  html += '</div>';
+  document.getElementById('heatmap-container').innerHTML = html;
+
+  // Churn
+  destroyChart('churn');
+  charts['churn'] = new Chart(document.getElementById('churnChart'), {
+    type:'bar',
+    data:{ labels:['Low Risk','Medium Risk','High Risk'],
+      datasets:[{ label:'Customers',
+        data:[rand(3000,5000),rand(1000,2000),rand(200,500)],
+        backgroundColor:['#34d399','#f59e0b','#f87171'], borderRadius:8 }]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{ legend:{ display:false }}}
+  });
+
+  destroyChart('acq');
+  charts['acq'] = new Chart(document.getElementById('acqChart'), {
+    type:'bar',
+    data:{ labels:['Organic','Paid Search','Paid Social','Email','Referral'],
+      datasets:[{ label:'New Customers',
+        data:[rand(400,700),rand(250,450),rand(150,300),rand(100,200),rand(50,120)],
+        backgroundColor:'#6366f1', borderRadius:6 }]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} }}
+  });
+
+  destroyChart('ltv');
+  charts['ltv'] = new Chart(document.getElementById('ltvChart'), {
+    type:'pie',
+    data:{ labels:['High LTV ($500+)','Mid LTV ($100-500)','Low LTV (<$100)'],
+      datasets:[{ data:[rand(15,25),rand(35,50),rand(30,45)],
+        backgroundColor:['#6366f1','#22d3ee','#64748b'],
+        borderWidth:2, borderColor:'#1a1d27' }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8' }}}}
+  });
+}
+
+// ── Inventory charts ──────────────────────────────────────────────────────────
+function initInventory() {
+  loadInventoryFromAPI();
+
+  destroyChart('forecast');
+  const fDays = Array.from({length:60}, (_,i)=>{
+    const d=new Date(); d.setDate(d.getDate()-30+i);
+    return d.toLocaleDateString('en',{month:'short',day:'numeric'});
+  });
+  let fv=180;
+  const actual  = Array.from({length:30}, ()=>{ fv+=rand(-20,25); return Math.max(50,fv); });
+  const foreYhat= [...actual.slice(-1)];
+  const foreLo  = [...actual.slice(-1)];
+  const foreHi  = [...actual.slice(-1)];
+  for(let i=0;i<30;i++){
+    const last = foreYhat[foreYhat.length-1];
+    foreYhat.push(last + rand(-8,12));
+    foreLo.push(foreYhat[foreYhat.length-1] - rand(15,30));
+    foreHi.push(foreYhat[foreYhat.length-1] + rand(15,30));
+  }
+  charts['forecast'] = new Chart(document.getElementById('forecastChart'), {
+    type:'line',
+    data:{ labels:fDays, datasets:[
+      { label:'Actual',   data:[...actual,...Array(30).fill(null)],  borderColor:'#22d3ee', tension:.4, pointRadius:2 },
+      { label:'Forecast', data:[...Array(29).fill(null),...foreYhat],borderColor:'#6366f1', borderDash:[5,3], tension:.4, pointRadius:0 },
+      { label:'Upper CI', data:[...Array(29).fill(null),...foreHi],  borderColor:'rgba(99,102,241,.3)', backgroundColor:'rgba(99,102,241,.08)', fill:'+1', tension:.4, pointRadius:0, borderWidth:1 },
+      { label:'Lower CI', data:[...Array(29).fill(null),...foreLo],  borderColor:'rgba(99,102,241,.3)', fill:false, tension:.4, pointRadius:0, borderWidth:1 }
+    ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      plugins:{ ...CHART_DEFAULTS.plugins, tooltip:{ filter: i=>i.datasetIndex<2 }}}
+  });
+
+  destroyChart('sell');
+  charts['sell'] = new Chart(document.getElementById('sellChart'), {
+    type:'bar',
+    data:{ labels:['Apparel','Footwear','Accessories','Outerwear','Electronics'],
+      datasets:[
+        { label:'Sell-Through %', data:[rand(65,85),rand(50,75),rand(70,90),rand(45,65),rand(55,80)],
+          backgroundColor:['#6366f1','#22d3ee','#34d399','#f59e0b','#f87171'], borderRadius:6 }
+      ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{ legend:{display:false} },
+      scales:{ ...CHART_DEFAULTS.scales, x:{ ...CHART_DEFAULTS.scales.x, max:100,
+        ticks:{ callback:v=>v+'%', color:'#64748b' }}}}
+  });
+
+  // Inventory table
+  const skus=[
+    ['SKU-SHIRT-BLU-M','Apparel',   rand(5,18),  20, rand(2,6),  'red'],
+    ['SKU-SHOE-RUN-10', 'Footwear',  rand(22,45), 15, rand(8,14), 'yellow'],
+    ['SKU-BAG-TOTE-BLK','Accessories',rand(60,120),10, rand(20,35),'green'],
+    ['SKU-JEAN-SLM-32', 'Apparel',   rand(12,28), 25, rand(4,9),  'yellow'],
+    ['SKU-JACKET-BLK-M','Outerwear', rand(3,10),  20, rand(1,4),  'red'],
+    ['SKU-HAT-CAP-RED', 'Accessories',rand(80,150),8,  rand(30,50),'green'],
+  ];
+  let rows='';
+  skus.forEach(([sku,cat,stock,rp,days,cl])=>{
+    const vel = ((stock/days)*7).toFixed(1);
+    const label = cl==='red'?'Critical':cl==='yellow'?'Monitor':'Healthy';
+    rows+=`<tr>
+      <td style="font-family:monospace;font-size:12px;color:#818cf8">${sku}</td>
+      <td>${cat}</td>
+      <td style="font-weight:700">${stock}</td>
+      <td style="color:#94a3b8">${rp}</td>
+      <td style="font-weight:600;color:${cl==='red'?'#f87171':cl==='yellow'?'#fbbf24':'#34d399'}">${days} days</td>
+      <td><span class="badge ${cl}"><span class="badge-dot"></span>${label}</span></td>
+      <td style="color:#94a3b8">${vel} units/wk</td>
+    </tr>`;
+  });
+  document.getElementById('inv-tbody').innerHTML = rows;
+}
+
+// ── Pipeline charts ───────────────────────────────────────────────────────────
+function initPipeline() {
+  loadPipelineFromAPI();
+
+  const wkDays = last7();
+
+  destroyChart('pipeline');
+  charts['pipeline'] = new Chart(document.getElementById('pipelineChart'), {
+    type:'bar',
+    data:{ labels:wkDays, datasets:[
+      { label:'Success', data:wkDays.map(()=>rand(1,3)),  backgroundColor:'#34d399', borderRadius:4 },
+      { label:'Retry',   data:wkDays.map(()=>rand(0,1)),  backgroundColor:'#f59e0b', borderRadius:4 },
+      { label:'Failed',  data:wkDays.map(()=>Math.random()<.15?1:0), backgroundColor:'#f87171', borderRadius:4 }
+    ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false, stacked:true }
+  });
+
+  destroyChart('freshness');
+  charts['freshness'] = new Chart(document.getElementById('freshnessChart'), {
+    type:'bar',
+    data:{ labels:['Bronze','Silver','Gold','API Cache'],
+      datasets:[{ label:'Age (minutes)',
+        data:[rand(2,8),rand(8,14),rand(12,18),rand(1,3)],
+        backgroundColor:['#f59e0b','#6366f1','#22d3ee','#34d399'],
+        borderRadius:8 }]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ ...CHART_DEFAULTS.scales, y:{ ...CHART_DEFAULTS.scales.y,
+        ticks:{ callback:v=>v+'m', color:'#64748b' }}}}
+  });
+
+  // DAG runs
+  const tasks = ['produce_events','bronze_to_silver','dbt_run','dbt_test','data_quality','done'];
+  const taskIcons = ['📤','⚙️','🔧','✅','🔍','🏁'];
+  const durations = [rand(30,80),rand(120,300),rand(60,150),rand(20,50),rand(15,40),rand(1,5)];
+  let dagHtml = '';
+  tasks.forEach((t,i)=>{
+    const dur = durations[i];
+    const status = Math.random()<.95 ? 'green' : (Math.random()<.5 ? 'yellow' : 'red');
+    const label = status==='green'?'Success':status==='yellow'?'Retry':'Failed';
+    const pct = Math.min(100, Math.round(dur/300*100));
+    const gradColor = status==='green'?'#34d399':status==='yellow'?'#f59e0b':'#f87171';
+    dagHtml += `<div class="pipeline-row">
+      <div class="p-icon">${taskIcons[i]}</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span class="p-name">${t}</span>
+          <span class="badge ${status}"><span class="badge-dot"></span>${label}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct}%;background:${gradColor}"></div>
+        </div>
+      </div>
+      <div class="p-time">${dur < 60 ? dur+'s' : Math.floor(dur/60)+'m '+dur%60+'s'}</div>
+    </div>`;
+  });
+  document.getElementById('dag-status').innerHTML = dagHtml;
+
+  destroyChart('dq');
+  const dqDays = last7();
+  charts['dq'] = new Chart(document.getElementById('dqChart'), {
+    type:'bar',
+    data:{ labels:dqDays, datasets:[
+      { label:'Passed', data:dqDays.map(()=>rand(120,130)), backgroundColor:'#34d399', borderRadius:4 },
+      { label:'Failed', data:dqDays.map(()=>rand(0,3)),     backgroundColor:'#f87171', borderRadius:4 }
+    ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false }
+  });
+
+  destroyChart('volume');
+  const vDays = last7();
+  charts['volume'] = new Chart(document.getElementById('volumeChart'), {
+    type:'line',
+    data:{ labels:vDays, datasets:[
+      { label:'Bronze', data:vDays.map(()=>rand(50000,80000)), borderColor:'#f59e0b', tension:.4, pointRadius:3 },
+      { label:'Silver', data:vDays.map(()=>rand(45000,75000)), borderColor:'#6366f1', tension:.4, pointRadius:3 },
+      { label:'Gold',   data:vDays.map(()=>rand(40000,68000)), borderColor:'#22d3ee', tension:.4, pointRadius:3 }
+    ]},
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false }
+  });
+}
+
+// ── Init dispatcher ──────────────────────────────────────────────────────────
+function initTab(id) {
+  updateKPIs();
+  if(id==='overview')  initOverview();
+  if(id==='revenue')   initRevenue();
+  if(id==='customers') initCustomers();
+  if(id==='inventory') initInventory();
+  if(id==='pipeline')  initPipeline();
+}
+
+function refreshAll() {
+  const active = document.querySelector('.tab-panel.active');
+  if(active) initTab(active.id.replace('tab-',''));
+  document.getElementById('last-updated').textContent =
+    'Last updated: ' + new Date().toLocaleTimeString();
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+initTab('overview');
+// Auto-refresh every 30 seconds
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
