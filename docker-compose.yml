@@ -1,54 +1,52 @@
-# ── RetailPulse — Local Development Stack ─────────────────────────────────────
+# ── RetailPulse — Local Development Stack ──────────────────────────────────────
 #
 # Services:
-#   postgres-source    :5433   Source OLTP database
-#   postgres-airflow   (internal)  Airflow metadata DB
-#   kafka              :9092   Kafka broker (KRaft, no Zookeeper)
-#   kafka-ui           :8080   Kafka web UI
-#   airflow-webserver  :8081   Airflow UI  (admin / admin)
-#   airflow-scheduler  (internal)  Airflow task runner
-#   api                :8000   FastAPI serving layer
+#   postgres-source   :5432   Source OLTP database
+#   postgres-airflow  (internal)  Airflow metadata DB
+#   kafka             :9092   Kafka broker (KRaft, no Zookeeper)
+#   kafka-ui          :8080   Kafka web UI
+#   airflow-webserver :8081   Airflow UI  (admin / admin)
+#   airflow-scheduler (internal)  Airflow task runner
+#   api               :8000   FastAPI serving layer
+#   dashboard         :5000   Real-time SSE dashboard  ← NEW
 #
 # Quick start:
 #   1. copy .env.example .env
 #   2. docker compose up -d
 #   3. Open http://localhost:8081  (Airflow)
-#        http://localhost:8080  (Kafka UI)
-#        http://localhost:8000/docs  (API)
-# ─────────────────────────────────────────────────────────────────────────────
+#      Open http://localhost:5000  (Real-time dashboard)  ← NEW
+#      Open http://localhost:8080  (Kafka UI)
+#      Open http://localhost:8000/docs  (API)
 
 x-airflow-env: &airflow-env
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
+  AIRFLOW__CORE__FERNET_KEY: "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+  AIRFLOW__WEBSERVER__SECRET_KEY: "retailpulse-secret-key-change-in-prod"
   AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-  AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY:-ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg=}"
-  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow"
-  AIRFLOW__WEBSERVER__SECRET_KEY: "${AIRFLOW_SECRET_KEY:-retailpulse_dev_secret_32chars__}"
-  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
   KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
-  RETAILPULSE_DB_URL: "postgresql://retailpulse:${POSTGRES_PASSWORD:-retailpulse_dev_only}@postgres-source/retailpulse"
-  BRONZE_PATH: "/opt/airflow/data/bronze"
   SILVER_PATH: "/opt/airflow/data/silver"
   GOLD_PATH: "/opt/airflow/data/gold"
-  DUCKDB_PATH: "/opt/airflow/data/gold/retailpulse.duckdb"
   PII_SALT: "${PII_SALT:-local_dev_salt_change_in_prod}"
-  _PIP_ADDITIONAL_REQUIREMENTS: "confluent-kafka>=2.3 pandas>=1.3 pyarrow>=14.0 dbt-core==1.8.0 dbt-duckdb==1.8.0"
 
 services:
 
-  # ── 1. Source OLTP Database ──────────────────────────────────────────────────
+  # ── 1. Source Postgres (OLTP) ─────────────────────────────────────────────
   postgres-source:
     image: postgres:16-alpine
     container_name: rp-postgres-source
     environment:
       POSTGRES_USER: retailpulse
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-retailpulse_dev_only}"
+      POSTGRES_PASSWORD: retailpulse
       POSTGRES_DB: retailpulse
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
+      - postgres_source_data:/var/lib/postgresql/data
       - ./scripts/sql/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
       - ./scripts/sql/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
-      - postgres_source_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U retailpulse -d retailpulse"]
       interval: 5s
@@ -56,7 +54,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ── 2. Airflow Metadata Database ─────────────────────────────────────────────
+  # ── 2. Airflow Postgres (metadata) ───────────────────────────────────────
   postgres-airflow:
     image: postgres:16-alpine
     container_name: rp-postgres-airflow
@@ -73,7 +71,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ── 3. Kafka Broker (KRaft mode — no Zookeeper needed) ───────────────────────
+  # ── 3. Kafka (KRaft mode — no Zookeeper) ─────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: rp-kafka
@@ -93,7 +91,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_LOG_RETENTION_HOURS: 24
-      CLUSTER_ID: "gMW0HOu5TgeZMnjzCrIZww"
+      CLUSTER_ID: "gMW0HOu5TgeZMnjzCrIZwww"
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -104,7 +102,7 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # ── 4. Kafka Web UI ──────────────────────────────────────────────────────────
+  # ── 4. Kafka Web UI ──────────────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
     container_name: rp-kafka-ui
@@ -117,7 +115,7 @@ services:
       - kafka
     restart: unless-stopped
 
-  # ── 5. Airflow Init (runs once, then exits) ───────────────────────────────────
+  # ── 5. Airflow Init (runs once, then exits) ───────────────────────────────
   airflow-init:
     image: apache/airflow:2.9.2-python3.11
     container_name: rp-airflow-init
@@ -138,7 +136,7 @@ services:
       "
     restart: on-failure
 
-  # ── 6. Airflow Webserver ──────────────────────────────────────────────────────
+  # ── 6. Airflow Webserver ──────────────────────────────────────────────────
   airflow-webserver:
     image: apache/airflow:2.9.2-python3.11
     container_name: rp-airflow-webserver
@@ -160,16 +158,16 @@ services:
       - ./.dbt:/opt/airflow/.dbt
       - ./spark:/opt/airflow/spark
       - ./ingestion:/opt/airflow/ingestion
-      - ./data_quality:/opt/airflow/data_quality
     command: webserver
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
 
-  # ── 7. Airflow Scheduler ──────────────────────────────────────────────────────
+  # ── 7. Airflow Scheduler ──────────────────────────────────────────────────
   airflow-scheduler:
     image: apache/airflow:2.9.2-python3.11
     container_name: rp-airflow-scheduler
@@ -177,10 +175,6 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-      kafka:
-        condition: service_started
-      postgres-source:
-        condition: service_healthy
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
@@ -189,11 +183,10 @@ services:
       - ./.dbt:/opt/airflow/.dbt
       - ./spark:/opt/airflow/spark
       - ./ingestion:/opt/airflow/ingestion
-      - ./data_quality:/opt/airflow/data_quality
     command: scheduler
     restart: unless-stopped
 
-  # ── 8. FastAPI Serving Layer ──────────────────────────────────────────────────
+  # ── 8. FastAPI serving layer ──────────────────────────────────────────────
   api:
     build:
       context: .
@@ -202,18 +195,50 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DUCKDB_PATH: /data/gold/retailpulse.duckdb
-      API_SECRET_KEY: "${API_SECRET_KEY:-dev_api_secret_key_change_in_prod}"
+      DUCKDB_PATH: /data/retailpulse.duckdb
       PII_SALT: "${PII_SALT:-local_dev_salt_change_in_prod}"
+      API_SECRET_KEY: "${API_SECRET_KEY:-dev_secret_key}"
       LOG_LEVEL: info
+      REQUIRE_API_KEY: "false"
+    volumes:
+      - ./data:/data
     depends_on:
       postgres-source:
         condition: service_healthy
-    volumes:
-      - ./data:/data
     restart: unless-stopped
 
-# ── Named Volumes ──────────────────────────────────────────────────────────────
+  # ── 9. Real-Time Dashboard ─────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: rp-dashboard
+    ports:
+      - "5001:5000"
+    environment:
+      PORT: "5000"
+      PII_SALT: "${PII_SALT:-local_dev_salt_change_in_prod}"
+      API_SECRET_KEY: "${API_SECRET_KEY:-dev_secret_key}"
+      REQUIRE_API_KEY: "false"
+      RT_EVENTS_PER_SECOND: "2"
+      RT_CHURN_WORKERS: "2"
+    volumes:
+      - ./data:/app/data
+      - ./dashboard:/app/dashboard
+      - ./realtime:/app/realtime
+      - ./spark:/app/spark
+      - ./data_quality:/app/data_quality
+    depends_on:
+      - postgres-source
+      - kafka
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
 volumes:
   postgres_source_data:
   postgres_airflow_data:
