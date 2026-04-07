@@ -1,0 +1,23 @@
+# Dockerfile.dashboard
+# Runs the RetailPulse real-time dashboard inside Docker
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install only what's needed
+COPY requirements.txt .
+RUN pip install --no-cache-dir flask pandas numpy
+
+# Copy all project files
+COPY . .
+
+# Expose dashboard port
+EXPOSE 5000
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PORT=5000
+ENV FLASK_ENV=production
+
+# Run the real-time dashboard
+CMD ["python", "realtime_app.py"]
